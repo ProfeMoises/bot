@@ -222,6 +222,16 @@
                 border-radius: 20px;
             }
         }
+        .bubble br {
+        margin-bottom: 8px;
+        content: "";
+        display: block;
+        }
+        .bubble a {
+        color: #5a67d8;
+        text-decoration: underline;
+        word-break: break-all;
+        }
     </style>
     <!-- Cargar Puter.js (sin necesidad de API Key) -->
     <script src="https://js.puter.com/v2/"></script>
@@ -250,25 +260,56 @@
     </div>
 </div>
 
+<!-- El <head> y <style> son exactamente iguales que antes. Solo cambia el <script> -->
 <script>
-    // Configuración
-    // Modelo gratuito recomendado: 'gpt-4.1-nano' (rápido y eficaz)
-    // Alternativas: 'claude-sonnet-4-5', 'google/gemini-2.5-flash', 'deepseek/deepseek-r1'
     const AI_MODEL = 'gpt-4.1-nano';
-    
-    // Referencias al DOM
     const messagesArea = document.getElementById('messagesArea');
     const userInput = document.getElementById('userInput');
     const sendButton = document.getElementById('sendButton');
-    
-    // Agregar mensaje al chat
-    function addMessage(text, sender) {
+
+    // Función para formatear la respuesta del bot: respeta saltos de línea y convierte URLs en enlaces
+    function formatBotMessage(text) {
+        // 1. Escapar HTML para inyección segura (evita XSS)
+        const escapeHtml = (str) => {
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        };
+        
+        let formatted = escapeHtml(text);
+        
+        // 2. Convertir saltos de línea \n en <br>
+        formatted = formatted.replace(/\n/g, '<br>');
+        
+        // 3. Convertir URLs (http, https) en enlaces clickeables
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        formatted = formatted.replace(urlRegex, function(url) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#5a67d8; text-decoration:underline;">${url}</a>`;
+        });
+        
+        // 4. Mejorar listas: si hay "1. ", "2. " etc., lo dejamos igual pero con <br> ya funciona bien.
+        // Opcional: podrías añadir un poco de margen a los <br> consecutivos, pero no es necesario.
+        
+        return formatted;
+    }
+
+    function addMessage(text, sender, isHtml = false) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
         
         const bubble = document.createElement('div');
         bubble.classList.add('bubble');
-        bubble.textContent = text;
+        
+        if (isHtml && sender === 'bot') {
+            // Insertar HTML formateado (seguro) para el bot
+            bubble.innerHTML = text;
+        } else {
+            // Mensajes de usuario o texto plano sin formato: usar textContent por seguridad
+            bubble.textContent = text;
+        }
         
         const timestamp = document.createElement('div');
         timestamp.classList.add('timestamp');
@@ -278,13 +319,11 @@
         messageDiv.appendChild(bubble);
         messageDiv.appendChild(timestamp);
         messagesArea.appendChild(messageDiv);
-        
-        // Auto scroll hacia abajo
         messagesArea.scrollTop = messagesArea.scrollHeight;
         return messageDiv;
     }
-    
-    // Mostrar indicador "escribiendo"
+
+    // Indicador "escribiendo" (igual que antes)
     let typingElement = null;
     function showTyping() {
         if (typingElement) return;
@@ -306,31 +345,24 @@
             typingElement = null;
         }
     }
-    
-    // Función principal para preguntar a la IA con Puter.js
+
     async function askBot(question) {
         if (!question.trim()) return;
         
-        // Agregar mensaje del usuario al chat
         addMessage(question, 'user');
         userInput.value = '';
         userInput.disabled = true;
         sendButton.disabled = true;
         
-        // Mostrar "escribiendo..."
         showTyping();
         
         try {
-            // Llamada a Puter.js (sin necesidad de API Key, sin backend)
-            // Usamos streaming opcional para mejor experiencia
             const response = await puter.ai.chat(question, { model: AI_MODEL });
             
-            // La respuesta puede venir como string o como objeto, dependiendo del modelo
             let botReply = '';
             if (typeof response === 'string') {
                 botReply = response;
             } else if (response && response.message && response.message.content) {
-                // Para modelos Claude, Gemini, etc.
                 if (Array.isArray(response.message.content)) {
                     botReply = response.message.content.map(c => c.text || c).join('');
                 } else {
@@ -342,13 +374,14 @@
                 botReply = String(response);
             }
             
-            // Eliminar "escribiendo..."
             hideTyping();
-            // Mostrar respuesta del bot
-            addMessage(botReply || "Lo siento, no pude generar una respuesta.", 'bot');
+            
+            // Formatear la respuesta del bot (HTML con saltos de línea y enlaces)
+            const formattedReply = formatBotMessage(botReply || "Lo siento, no pude generar una respuesta.");
+            addMessage(formattedReply, 'bot', true);  // true = es HTML
             
         } catch (error) {
-            console.error('Error al llamar a Puter.js:', error);
+            console.error(error);
             hideTyping();
             addMessage(`❌ Error: ${error.message || 'No se pudo conectar con el servicio.'}`, 'bot');
         } finally {
@@ -357,8 +390,7 @@
             userInput.focus();
         }
     }
-    
-    // Eventos: botón y tecla Enter
+
     sendButton.addEventListener('click', () => {
         const question = userInput.value.trim();
         if (question) askBot(question);
