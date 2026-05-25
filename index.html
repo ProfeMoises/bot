@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Mi Chatbot con IA 🤖</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 85vh;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Encabezado */
+        .chat-header {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c0 100%);
+            color: white;
+            padding: 20px 24px;
+            text-align: center;
+        }
+
+        .chat-header h2 {
+            font-weight: 600;
+            font-size: 1.5rem;
+            letter-spacing: -0.3px;
+        }
+
+        .chat-header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-top: 6px;
+        }
+
+        /* Área de mensajes */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: #f9fafb;
+        }
+
+        /* Burbujas de mensaje */
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .user-message {
+            align-self: flex-end;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+        }
+
+        .bubble {
+            padding: 12px 18px;
+            border-radius: 24px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            word-wrap: break-word;
+        }
+
+        .user-message .bubble {
+            background: #5a67d8;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message .bubble {
+            background: white;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .timestamp {
+            font-size: 0.7rem;
+            margin-top: 5px;
+            margin-left: 12px;
+            margin-right: 12px;
+            color: #6c757d;
+        }
+
+        /* Input y botón */
+        .input-area {
+            padding: 16px 20px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        #userInput:focus {
+            border-color: #5a67d8;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.2);
+        }
+
+        #sendButton {
+            background: #5a67d8;
+            border: none;
+            color: white;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            font-size: 1.3rem;
+        }
+
+        #sendButton:hover {
+            background: #4c51bf;
+        }
+
+        #sendButton:active {
+            transform: scale(0.96);
+        }
+
+        /* Indicador de "escribiendo..." */
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: 12px 18px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            border-bottom-left-radius: 4px;
+            width: fit-content;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #94a3b8;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-6px); opacity: 1; }
+        }
+
+        /* Scroll personalizado */
+        .messages-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-area::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 640px) {
+            .message {
+                max-width: 90%;
+            }
+            .chat-container {
+                height: 90vh;
+                border-radius: 20px;
+            }
+        }
+    </style>
+    <!-- Cargar Puter.js (sin necesidad de API Key) -->
+    <script src="https://js.puter.com/v2/"></script>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>🤖 Asistente IA</h2>
+        <p>Con tecnología de Puter.js • Modelo: GPT-4.1 Nano</p>
+    </div>
+
+    <div class="messages-area" id="messagesArea">
+        <!-- Mensaje de bienvenida -->
+        <div class="message bot-message">
+            <div class="bubble">
+                ¡Hola! Soy tu asistente con IA. Pregúntame cualquier cosa 💬
+            </div>
+            <div class="timestamp"></div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Escribe tu mensaje aquí..." autocomplete="off">
+        <button id="sendButton">➤</button>
+    </div>
+</div>
+
+<script>
+    // Configuración
+    // Modelo gratuito recomendado: 'gpt-4.1-nano' (rápido y eficaz)
+    // Alternativas: 'claude-sonnet-4-5', 'google/gemini-2.5-flash', 'deepseek/deepseek-r1'
+    const AI_MODEL = 'gpt-4.1-nano';
+    
+    // Referencias al DOM
+    const messagesArea = document.getElementById('messagesArea');
+    const userInput = document.getElementById('userInput');
+    const sendButton = document.getElementById('sendButton');
+    
+    // Agregar mensaje al chat
+    function addMessage(text, sender) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+        
+        const bubble = document.createElement('div');
+        bubble.classList.add('bubble');
+        bubble.textContent = text;
+        
+        const timestamp = document.createElement('div');
+        timestamp.classList.add('timestamp');
+        const now = new Date();
+        timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        messageDiv.appendChild(bubble);
+        messageDiv.appendChild(timestamp);
+        messagesArea.appendChild(messageDiv);
+        
+        // Auto scroll hacia abajo
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+        return messageDiv;
+    }
+    
+    // Mostrar indicador "escribiendo"
+    let typingElement = null;
+    function showTyping() {
+        if (typingElement) return;
+        const typingDiv = document.createElement('div');
+        typingDiv.classList.add('message', 'bot-message');
+        typingDiv.id = 'typingIndicator';
+        const indicator = document.createElement('div');
+        indicator.classList.add('typing-indicator');
+        indicator.innerHTML = '<span></span><span></span><span></span>';
+        typingDiv.appendChild(indicator);
+        messagesArea.appendChild(typingDiv);
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+        typingElement = typingDiv;
+    }
+    
+    function hideTyping() {
+        if (typingElement) {
+            typingElement.remove();
+            typingElement = null;
+        }
+    }
+    
+    // Función principal para preguntar a la IA con Puter.js
+    async function askBot(question) {
+        if (!question.trim()) return;
+        
+        // Agregar mensaje del usuario al chat
+        addMessage(question, 'user');
+        userInput.value = '';
+        userInput.disabled = true;
+        sendButton.disabled = true;
+        
+        // Mostrar "escribiendo..."
+        showTyping();
+        
+        try {
+            // Llamada a Puter.js (sin necesidad de API Key, sin backend)
+            // Usamos streaming opcional para mejor experiencia
+            const response = await puter.ai.chat(question, { model: AI_MODEL });
+            
+            // La respuesta puede venir como string o como objeto, dependiendo del modelo
+            let botReply = '';
+            if (typeof response === 'string') {
+                botReply = response;
+            } else if (response && response.message && response.message.content) {
+                // Para modelos Claude, Gemini, etc.
+                if (Array.isArray(response.message.content)) {
+                    botReply = response.message.content.map(c => c.text || c).join('');
+                } else {
+                    botReply = response.message.content;
+                }
+            } else if (response && response.message) {
+                botReply = response.message;
+            } else {
+                botReply = String(response);
+            }
+            
+            // Eliminar "escribiendo..."
+            hideTyping();
+            // Mostrar respuesta del bot
+            addMessage(botReply || "Lo siento, no pude generar una respuesta.", 'bot');
+            
+        } catch (error) {
+            console.error('Error al llamar a Puter.js:', error);
+            hideTyping();
+            addMessage(`❌ Error: ${error.message || 'No se pudo conectar con el servicio.'}`, 'bot');
+        } finally {
+            userInput.disabled = false;
+            sendButton.disabled = false;
+            userInput.focus();
+        }
+    }
+    
+    // Eventos: botón y tecla Enter
+    sendButton.addEventListener('click', () => {
+        const question = userInput.value.trim();
+        if (question) askBot(question);
+    });
+    
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !userInput.disabled) {
+            const question = userInput.value.trim();
+            if (question) askBot(question);
+        }
+    });
+</script>
+</body>
+</html>
