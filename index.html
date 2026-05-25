@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Mi Chatbot con IA 🤖</title>
+    <title>Chatbot IA - Selecciona el modelo</title>
     <style>
         * {
             box-sizing: border-box;
@@ -33,27 +33,54 @@
             overflow: hidden;
         }
 
-        /* Encabezado */
         .chat-header {
             background: linear-gradient(135deg, #5a67d8 0%, #6b46c0 100%);
             color: white;
-            padding: 20px 24px;
+            padding: 16px 20px;
             text-align: center;
         }
 
         .chat-header h2 {
             font-weight: 600;
-            font-size: 1.5rem;
+            font-size: 1.3rem;
             letter-spacing: -0.3px;
         }
 
-        .chat-header p {
+        /* Selector de modelo */
+        .model-selector {
+            background: rgba(255,255,255,0.15);
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
             font-size: 0.85rem;
-            opacity: 0.9;
-            margin-top: 6px;
+        }
+        .model-selector label {
+            font-weight: 500;
+        }
+        #modelSelect {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 40px;
+            border: none;
+            background: white;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            outline: none;
+        }
+        #modelStatus {
+            font-size: 0.75rem;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
         }
 
-        /* Área de mensajes */
         .messages-area {
             flex: 1;
             overflow-y: auto;
@@ -64,7 +91,6 @@
             background: #f9fafb;
         }
 
-        /* Burbujas de mensaje */
         .message {
             display: flex;
             flex-direction: column;
@@ -113,6 +139,16 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
+        .bubble a {
+            color: #5a67d8;
+            text-decoration: underline;
+            word-break: break-all;
+        }
+
+        .bubble br {
+            margin-bottom: 6px;
+        }
+
         .timestamp {
             font-size: 0.7rem;
             margin-top: 5px;
@@ -121,7 +157,6 @@
             color: #6c757d;
         }
 
-        /* Input y botón */
         .input-area {
             padding: 16px 20px;
             background: white;
@@ -170,7 +205,6 @@
             transform: scale(0.96);
         }
 
-        /* Indicador de "escribiendo..." */
         .typing-indicator {
             display: flex;
             gap: 6px;
@@ -199,7 +233,6 @@
             30% { transform: translateY(-6px); opacity: 1; }
         }
 
-        /* Scroll personalizado */
         .messages-area::-webkit-scrollbar {
             width: 6px;
         }
@@ -221,55 +254,61 @@
                 height: 90vh;
                 border-radius: 20px;
             }
-        }
-        .bubble br {
-        margin-bottom: 8px;
-        content: "";
-        display: block;
-        }
-        .bubble a {
-        color: #5a67d8;
-        text-decoration: underline;
-        word-break: break-all;
+            .model-selector {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #modelStatus {
+                text-align: center;
+            }
         }
     </style>
-    <!-- Cargar Puter.js (sin necesidad de API Key) -->
     <script src="https://js.puter.com/v2/"></script>
 </head>
 <body>
 
 <div class="chat-container">
     <div class="chat-header">
-        <h2>🤖 Asistente IA</h2>
-        <p>Con tecnología de Puter.js • Modelo: GPT-4.1 Nano</p>
+        <h2>🤖 Asistente IA · Modelos disponibles</h2>
+        <div class="model-selector">
+            <label>🧠 Modelo:</label>
+            <select id="modelSelect" disabled>
+                <option value="">Cargando lista...</option>
+            </select>
+            <span id="modelStatus">⚙️ Conectando...</span>
+        </div>
     </div>
 
     <div class="messages-area" id="messagesArea">
-        <!-- Mensaje de bienvenida -->
         <div class="message bot-message">
             <div class="bubble">
-                ¡Hola! Soy tu asistente con IA. Pregúntame cualquier cosa 💬
+                👋 ¡Hola! Estoy cargando la lista de modelos disponibles. En unos segundos podrás elegir cuál quieres usar y conversar conmigo.
             </div>
             <div class="timestamp"></div>
         </div>
     </div>
 
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="Escribe tu mensaje aquí..." autocomplete="off">
-        <button id="sendButton">➤</button>
+        <input type="text" id="userInput" placeholder="Escribe tu mensaje aquí..." autocomplete="off" disabled>
+        <button id="sendButton" disabled>➤</button>
     </div>
 </div>
 
-<!-- El <head> y <style> son exactamente iguales que antes. Solo cambia el <script> -->
 <script>
-    const AI_MODEL = 'gpt-4.1-nano';
+    // Elementos del DOM
+    const modelSelect = document.getElementById('modelSelect');
+    const modelStatus = document.getElementById('modelStatus');
     const messagesArea = document.getElementById('messagesArea');
     const userInput = document.getElementById('userInput');
     const sendButton = document.getElementById('sendButton');
+    
+    // Variable donde guardaremos el modelo activo
+    let currentModel = null;
+    let modelsList = [];
+    let isReady = false;  // Indica si ya se cargaron los modelos
 
-    // Función para formatear la respuesta del bot: respeta saltos de línea y convierte URLs en enlaces
+    // Funciones auxiliares de formato (igual que antes)
     function formatBotMessage(text) {
-        // 1. Escapar HTML para inyección segura (evita XSS)
         const escapeHtml = (str) => {
             return str.replace(/[&<>]/g, function(m) {
                 if (m === '&') return '&amp;';
@@ -278,44 +317,29 @@
                 return m;
             });
         };
-        
         let formatted = escapeHtml(text);
-        
-        // 2. Convertir saltos de línea \n en <br>
         formatted = formatted.replace(/\n/g, '<br>');
-        
-        // 3. Convertir URLs (http, https) en enlaces clickeables
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         formatted = formatted.replace(urlRegex, function(url) {
             return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#5a67d8; text-decoration:underline;">${url}</a>`;
         });
-        
-        // 4. Mejorar listas: si hay "1. ", "2. " etc., lo dejamos igual pero con <br> ya funciona bien.
-        // Opcional: podrías añadir un poco de margen a los <br> consecutivos, pero no es necesario.
-        
         return formatted;
     }
 
     function addMessage(text, sender, isHtml = false) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
-        
         const bubble = document.createElement('div');
         bubble.classList.add('bubble');
-        
         if (isHtml && sender === 'bot') {
-            // Insertar HTML formateado (seguro) para el bot
             bubble.innerHTML = text;
         } else {
-            // Mensajes de usuario o texto plano sin formato: usar textContent por seguridad
             bubble.textContent = text;
         }
-        
         const timestamp = document.createElement('div');
         timestamp.classList.add('timestamp');
         const now = new Date();
         timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
         messageDiv.appendChild(bubble);
         messageDiv.appendChild(timestamp);
         messagesArea.appendChild(messageDiv);
@@ -323,7 +347,7 @@
         return messageDiv;
     }
 
-    // Indicador "escribiendo" (igual que antes)
+    // Indicador de escritura
     let typingElement = null;
     function showTyping() {
         if (typingElement) return;
@@ -338,7 +362,6 @@
         messagesArea.scrollTop = messagesArea.scrollHeight;
         typingElement = typingDiv;
     }
-    
     function hideTyping() {
         if (typingElement) {
             typingElement.remove();
@@ -346,19 +369,22 @@
         }
     }
 
+    // Función para preguntar usando el modelo actual
     async function askBot(question) {
         if (!question.trim()) return;
-        
+        if (!isReady || !currentModel) {
+            addMessage("⚠️ Aún no se ha seleccionado un modelo. Espera a que cargue la lista y elige uno.", 'bot');
+            return;
+        }
+
         addMessage(question, 'user');
         userInput.value = '';
         userInput.disabled = true;
         sendButton.disabled = true;
-        
         showTyping();
-        
+
         try {
-            const response = await puter.ai.chat(question, { model: AI_MODEL });
-            
+            const response = await puter.ai.chat(question, { model: currentModel });
             let botReply = '';
             if (typeof response === 'string') {
                 botReply = response;
@@ -373,17 +399,13 @@
             } else {
                 botReply = String(response);
             }
-            
             hideTyping();
-            
-            // Formatear la respuesta del bot (HTML con saltos de línea y enlaces)
-            const formattedReply = formatBotMessage(botReply || "Lo siento, no pude generar una respuesta.");
-            addMessage(formattedReply, 'bot', true);  // true = es HTML
-            
+            const formatted = formatBotMessage(botReply || "Lo siento, no pude generar una respuesta.");
+            addMessage(formatted, 'bot', true);
         } catch (error) {
             console.error(error);
             hideTyping();
-            addMessage(`❌ Error: ${error.message || 'No se pudo conectar con el servicio.'}`, 'bot');
+            addMessage(`❌ Error con el modelo "${currentModel}": ${error.message || 'Intenta cambiar de modelo.'}`, 'bot');
         } finally {
             userInput.disabled = false;
             sendButton.disabled = false;
@@ -391,17 +413,125 @@
         }
     }
 
+    // Cargar lista de modelos desde puter.ai
+    async function loadModels() {
+        try {
+            modelStatus.textContent = '📡 Obteniendo lista...';
+            modelStatus.style.backgroundColor = "rgba(0,0,0,0.3)";
+            // Llamada a la API de Puter para listar modelos
+            const availableModels = await puter.ai.listModels();
+            // availableModels suele ser un array de strings (nombres de modelo)
+            if (!availableModels || availableModels.length === 0) {
+                throw new Error("No se recibieron modelos");
+            }
+            modelsList = availableModels;
+            // Limpiar select y llenar
+            modelSelect.innerHTML = '';
+            // Opcional: podemos filtrar o mostrar todos. Mostraremos todos.
+            for (const modelName of modelsList) {
+                const option = document.createElement('option');
+                option.value = modelName;
+                option.textContent = modelName;
+                modelSelect.appendChild(option);
+            }
+            // Seleccionar por defecto un modelo popular si existe, si no el primero
+            let defaultModel = modelsList.includes('gpt-4.1-nano') ? 'gpt-4.1-nano' : 
+                               (modelsList.includes('claude-sonnet-4-5') ? 'claude-sonnet-4-5' : modelsList[0]);
+            modelSelect.value = defaultModel;
+            currentModel = defaultModel;
+            modelSelect.disabled = false;
+            userInput.disabled = false;
+            sendButton.disabled = false;
+            isReady = true;
+            modelStatus.textContent = `✅ Listo · ${modelsList.length} modelos`;
+            modelStatus.style.backgroundColor = "rgba(0,0,0,0.2)";
+            // Mensaje de bienvenida específico
+            addMessage(`✨ Modelos cargados. Actualmente usando: <strong>${currentModel}</strong>. Puedes cambiar el modelo en el selector superior. ¡Pregúntame lo que quieras!`, 'bot', true);
+        } catch (error) {
+            console.error("Error cargando modelos:", error);
+            modelStatus.textContent = "⚠️ Error al cargar";
+            modelStatus.style.backgroundColor = "#c53030";
+            addMessage(`❌ No se pudo obtener la lista de modelos. Revisa tu conexión o si Puter.js está disponible. Error: ${error.message}`, 'bot');
+            // Intentar un fallback manual con algunos modelos conocidos por si acaso
+            const fallbackModels = ['gpt-4.1-nano', 'claude-sonnet-4-5', 'google/gemini-2.5-flash', 'deepseek/deepseek-r1'];
+            modelSelect.innerHTML = '';
+            for (const fb of fallbackModels) {
+                const opt = document.createElement('option');
+                opt.value = fb;
+                opt.textContent = fb;
+                modelSelect.appendChild(opt);
+            }
+            modelSelect.disabled = false;
+            currentModel = fallbackModels[0];
+            modelSelect.value = currentModel;
+            isReady = true;
+            userInput.disabled = false;
+            sendButton.disabled = false;
+            addMessage(`⚠️ Usando lista de respaldo. Modelo actual: ${currentModel}. Puedes cambiarlo.`, 'bot', true);
+        }
+    }
+
+    // Evento cambio de modelo
+    modelSelect.addEventListener('change', (e) => {
+        if (modelSelect.disabled) return;
+        const newModel = modelSelect.value;
+        if (newModel && modelsList.includes(newModel)) {
+            currentModel = newModel;
+            addMessage(`🔄 Cambiando modelo a: <strong>${currentModel}</strong>. Las próximas respuestas usarán este modelo.`, 'bot', true);
+        } else if (newModel && !modelsList.includes(newModel) && modelSelect.options.length > 0) {
+            // Puede ocurrir si se selecciona un fallback manual
+            currentModel = newModel;
+            addMessage(`🔄 Modelo cambiado a: ${currentModel} (desde lista de respaldo).`, 'bot', true);
+        }
+        // Guardar en localStorage opcional
+        try { localStorage.setItem('preferredModel', currentModel); } catch(e) {}
+    });
+
+    // Cargar modelo preferido guardado si existe
+    function loadStoredModel() {
+        try {
+            const saved = localStorage.getItem('preferredModel');
+            if (saved && modelsList.includes(saved)) {
+                modelSelect.value = saved;
+                currentModel = saved;
+                addMessage(`📌 Se ha restaurado tu modelo preferido: ${currentModel}`, 'bot', true);
+            }
+        } catch(e) {}
+    }
+
+    // Eventos de envío
     sendButton.addEventListener('click', () => {
         const question = userInput.value.trim();
-        if (question) askBot(question);
+        if (question && isReady) askBot(question);
     });
-    
     userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !userInput.disabled) {
+        if (e.key === 'Enter' && !userInput.disabled && isReady) {
             const question = userInput.value.trim();
             if (question) askBot(question);
         }
     });
+
+    // Inicializar: cargar modelos y después restaurar preferencia
+    (async function init() {
+        await loadModels();
+        // Después de cargar lista, restaurar si existe modelo guardado
+        if (modelsList.length > 0) {
+            try {
+                const saved = localStorage.getItem('preferredModel');
+                if (saved && modelsList.includes(saved)) {
+                    modelSelect.value = saved;
+                    currentModel = saved;
+                    addMessage(`🔁 Modelo preferido cargado: ${currentModel}`, 'bot', true);
+                }
+            } catch(e) {}
+        }
+        // Guardar cuando se cambie manualmente
+        modelSelect.addEventListener('change', () => {
+            if (currentModel) {
+                try { localStorage.setItem('preferredModel', currentModel); } catch(e) {}
+            }
+        });
+    })();
 </script>
 </body>
 </html>
