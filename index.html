@@ -418,41 +418,60 @@
         try {
             modelStatus.textContent = '📡 Obteniendo lista...';
             modelStatus.style.backgroundColor = "rgba(0,0,0,0.3)";
-            // Llamada a la API de Puter para listar modelos
+            // Obtener lista de modelos (array de objetos)
             const availableModels = await puter.ai.listModels();
-            // availableModels suele ser un array de strings (nombres de modelo)
             if (!availableModels || availableModels.length === 0) {
                 throw new Error("No se recibieron modelos");
             }
             modelsList = availableModels;
-            // Limpiar select y llenar
+            // Limpiar select y llenar con los IDs de cada modelo
             modelSelect.innerHTML = '';
-            // Opcional: podemos filtrar o mostrar todos. Mostraremos todos.
-            for (const modelName of modelsList) {
+            for (const modelObj of modelsList) {
                 const option = document.createElement('option');
-                option.value = modelName;
-                option.textContent = modelName;
+                // Asegurarse de usar el ID del modelo o el nombre si existe
+                const modelId = modelObj.id || modelObj.name;
+                if (modelId) {
+                    option.value = modelId;
+                    // Mostrar nombre legible si existe, sino el ID
+                    const displayName = modelObj.name || modelId;
+                    option.textContent = displayName;
+                } else {
+                    // Fallback por si falta id y name
+                    console.warn("Modelo sin id/name:", modelObj);
+                    option.value = JSON.stringify(modelObj);
+                    option.textContent = "Modelo desconocido";
+                }
                 modelSelect.appendChild(option);
             }
             // Seleccionar por defecto un modelo popular si existe, si no el primero
-            let defaultModel = modelsList.includes('gpt-4.1-nano') ? 'gpt-4.1-nano' : 
-                               (modelsList.includes('claude-sonnet-4-5') ? 'claude-sonnet-4-5' : modelsList[0]);
-            modelSelect.value = defaultModel;
-            currentModel = defaultModel;
+            const defaultModelId = modelsList.find(m => m.id === 'gpt-4.1-nano')?.id ||
+                                   modelsList.find(m => m.id === 'claude-sonnet-4-5')?.id ||
+                                   (modelsList[0]?.id);
+            if (defaultModelId) {
+                modelSelect.value = defaultModelId;
+                currentModel = defaultModelId;
+            } else {
+                // En caso extremo de que no haya modelos válidos
+                currentModel = null;
+            }
             modelSelect.disabled = false;
             userInput.disabled = false;
             sendButton.disabled = false;
             isReady = true;
             modelStatus.textContent = `✅ Listo · ${modelsList.length} modelos`;
             modelStatus.style.backgroundColor = "rgba(0,0,0,0.2)";
-            // Mensaje de bienvenida específico
-            addMessage(`✨ Modelos cargados. Actualmente usando: <strong>${currentModel}</strong>. Puedes cambiar el modelo en el selector superior. ¡Pregúntame lo que quieras!`, 'bot', true);
+            // Mensaje de bienvenida con el modelo activo
+            if (currentModel) {
+                addMessage(`✨ Modelos cargados. Actualmente usando: <strong>${currentModel}</strong>. Puedes cambiar el modelo en el selector superior. ¡Pregúntame lo que quieras!`, 'bot', true);
+            } else {
+                addMessage(`✨ Modelos cargados, pero no se pudo seleccionar uno automáticamente. Por favor elige un modelo del menú.`, 'bot', true);
+            }
         } catch (error) {
             console.error("Error cargando modelos:", error);
             modelStatus.textContent = "⚠️ Error al cargar";
             modelStatus.style.backgroundColor = "#c53030";
             addMessage(`❌ No se pudo obtener la lista de modelos. Revisa tu conexión o si Puter.js está disponible. Error: ${error.message}`, 'bot');
-            // Intentar un fallback manual con algunos modelos conocidos por si acaso
+            // Intentar un fallback manual con algunos modelos conocidos
             const fallbackModels = ['gpt-4.1-nano', 'claude-sonnet-4-5', 'google/gemini-2.5-flash', 'deepseek/deepseek-r1'];
             modelSelect.innerHTML = '';
             for (const fb of fallbackModels) {
@@ -475,23 +494,19 @@
     modelSelect.addEventListener('change', (e) => {
         if (modelSelect.disabled) return;
         const newModel = modelSelect.value;
-        if (newModel && modelsList.includes(newModel)) {
+        if (newModel) {
             currentModel = newModel;
             addMessage(`🔄 Cambiando modelo a: <strong>${currentModel}</strong>. Las próximas respuestas usarán este modelo.`, 'bot', true);
-        } else if (newModel && !modelsList.includes(newModel) && modelSelect.options.length > 0) {
-            // Puede ocurrir si se selecciona un fallback manual
-            currentModel = newModel;
-            addMessage(`🔄 Modelo cambiado a: ${currentModel} (desde lista de respaldo).`, 'bot', true);
+            // Guardar en localStorage
+            try { localStorage.setItem('preferredModel', currentModel); } catch(e) {}
         }
-        // Guardar en localStorage opcional
-        try { localStorage.setItem('preferredModel', currentModel); } catch(e) {}
     });
 
     // Cargar modelo preferido guardado si existe
     function loadStoredModel() {
         try {
             const saved = localStorage.getItem('preferredModel');
-            if (saved && modelsList.includes(saved)) {
+            if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
                 modelSelect.value = saved;
                 currentModel = saved;
                 addMessage(`📌 Se ha restaurado tu modelo preferido: ${currentModel}`, 'bot', true);
@@ -511,26 +526,12 @@
         }
     });
 
-    // Inicializar: cargar modelos y después restaurar preferencia
+    // Inicializar: cargar modelos y luego restaurar preferencia
     (async function init() {
         await loadModels();
-        // Después de cargar lista, restaurar si existe modelo guardado
         if (modelsList.length > 0) {
-            try {
-                const saved = localStorage.getItem('preferredModel');
-                if (saved && modelsList.includes(saved)) {
-                    modelSelect.value = saved;
-                    currentModel = saved;
-                    addMessage(`🔁 Modelo preferido cargado: ${currentModel}`, 'bot', true);
-                }
-            } catch(e) {}
+            loadStoredModel();
         }
-        // Guardar cuando se cambie manualmente
-        modelSelect.addEventListener('change', () => {
-            if (currentModel) {
-                try { localStorage.setItem('preferredModel', currentModel); } catch(e) {}
-            }
-        });
     })();
 </script>
 </body>
